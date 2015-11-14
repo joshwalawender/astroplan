@@ -13,15 +13,28 @@ import numpy as np
 
 from astropy import units as u
 
-__all__ = ['ObservingBlock', 'TransitionBlock',
+__all__ = ['ObservingBlock', 'TransitionBlock', 'ImageSet',
            'Scheduler', 'SequentialScheduler', 'Transitioner']
+
+
+class ImageSet(object):
+    @u.quantity_input(duration=u.second)
+    def __init__(self, duration, configuration={}, constraints=None):
+        self.duration = duration
+        self.configuration = configuration
+
+    @classmethod
+    def from_exposures(cls, timeperexp, nexp, overhead=0*u.second,
+                            configuration={}):
+        duration = nexp*(timeperexp + overhead)
+        imset = cls(duration, configuration=configuration)
+        return imset
 
 class ObservingBlock(object):
     @u.quantity_input(duration=u.second)
-    def __init__(self, target, duration, configuration={}, constraints=None):
+    def __init__(self, target, duration, constraints=None):
         self.target = target
         self.duration = duration
-        self.configuration = configuration
         self.constraints = constraints
         self.start_time = self.end_time = None
 
@@ -34,13 +47,11 @@ class ObservingBlock(object):
             return orig_repr.replace('object at', s)
 
     @classmethod
-    def from_exposures(cls, target, timeperexp, nexp, readouttime=0*u.second,
-                            configuration={}):
-        duration = nexp*(timeperexp + readouttime)
-        ob = cls(target, duration, configuration)
-        ob.timeperexp = timeperexp
-        ob.nexp = nexp
-        ob.readouttime = readouttime
+    def from_imagesets(cls, target, imageset_list):
+        duration = 0
+        for IS in imageset_list:
+            duration += IS.duration
+        ob = cls(target, duration)
         return ob
 
 class TransitionBlock(object):
@@ -85,6 +96,13 @@ class TransitionBlock(object):
 
         self._components = val
         self.duration = duration
+
+
+class SchedulableBlock(object):
+    def __init__(self, blocklist, configuration={}):
+        self.blocklist = blocklist
+        self.configuration = configuration
+        self.start_time = self.end_time = None
 
 
 class Scheduler(object):
@@ -293,11 +311,15 @@ class Transitioner(object):
             from .constraints import _get_altaz
             from astropy.time import Time
 
-            aaz = _get_altaz(Time([start_time]), observer, [oldblock.target, newblock.target])['altaz']
-            # TODO: make this [0] unnecessary by fixing _get_altaz to behave well in scalar-time case
-            sep = aaz[0].separation(aaz[1])[0]
-            
-            components['slew_time'] = sep / self.slew_rate
+            if type(oldblock) == ObservingBlock:
+                aaz = _get_altaz(Time([start_time]), observer, [oldblock.target, newblock.target])['altaz']
+                # TODO: make this [0] unnecessary by fixing _get_altaz to behave well in scalar-time case
+                sep = aaz[0].separation(aaz[1])[0]
+                components['slew_time'] = sep / self.slew_rate
+            elif type(oldblock) == TransitionBlock:
+                # if the previous block was a TransitionBlock, then assume slew
+                # hapens during that block
+                components['slew_time'] = 0.
         if self.instrument_reconfig_times is not None:
             components.update(self.compute_instrument_transitions(oldblock, newblock))
 
