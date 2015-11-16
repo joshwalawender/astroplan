@@ -317,6 +317,7 @@ class SummingScheduler(Scheduler):
             block_transitions = []
             block_constraint_results = []
             for b in blocks:
+                vetoed = False
                 #first figure out the transition
                 if len(new_blocks) > 0:
                     trans = self.transitioner(new_blocks[-1], b, current_time, self.observer)
@@ -329,9 +330,16 @@ class SummingScheduler(Scheduler):
 
                 constraint_res = []
                 for constraint in b._all_constraints:
-                    constraint_res.append(constraint(self.observer, [b.target], times))
+                    constraint_result = constraint(self.observer, [b.target], times)
+                    assert constraint_result >= 0
+                    if constraint_result == 0:
+                        vetoed = True
+                    constraint_res.append(constraint_result)
                 # take the product over all the constraints *and* times
-                block_constraint_results.append(b.priority*np.sum(constraint_res))
+                if not vetoed:
+                    block_constraint_results.append(b.priority*np.sum(constraint_res))
+                else:
+                    block_constraint_results.append(0)
 
             # now identify the block that's the best
             bestblock_idx = np.argmax(block_constraint_results)
