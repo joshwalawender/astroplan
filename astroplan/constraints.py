@@ -180,7 +180,8 @@ class AltitudeConstraint(Constraint):
         limits and False for outside).  If False, the constraint returns a 
         float on [0, 1], where 0 is the min altitude and 1 is the max.
     """
-    def __init__(self, min=None, max=None, boolean_constraint=True):
+    def __init__(self, min=None, max=None, boolean_constraint=True, weight=1.0):
+        self.weight = weight
         if min is None:
             self.min = -90*u.deg
         else:
@@ -198,7 +199,7 @@ class AltitudeConstraint(Constraint):
             uppermask = alt < self.max
             return lowermask & uppermask
         else:
-            return _rescale_minmax(alt, self.min, self.max)
+            return self.weight*_rescale_minmax(alt, self.min, self.max)
 
 
 class AirmassConstraint(AltitudeConstraint):
@@ -229,7 +230,8 @@ class AirmassConstraint(AltitudeConstraint):
 
         AirmassConstraint(2)
     """
-    def __init__(self, max=None, min=None, boolean_constraint=True):
+    def __init__(self, max=None, min=None, boolean_constraint=True, weight=1.0):
+        self.weight = weight
         self.min = min
         self.max = max
         self.boolean_constraint = boolean_constraint
@@ -256,7 +258,7 @@ class AirmassConstraint(AltitudeConstraint):
                 mx = self.max
             mi = 1 if self.min is None else self.min
             # we reverse order so that airmass close to 1/min is good
-            return 1 - _rescale_minmax(secz, mi, mx)
+            return self.weight*(1 - _rescale_minmax(secz, mi, mx))
 
 
 class AtNightConstraint(Constraint):
@@ -264,7 +266,8 @@ class AtNightConstraint(Constraint):
     Constrain the Sun to be below ``horizon``.
     """
     @u.quantity_input(horizon=u.deg)
-    def __init__(self, max_solar_altitude=0*u.deg, force_pressure_zero=True):
+    def __init__(self, max_solar_altitude=0*u.deg, force_pressure_zero=True,\
+                 weight=1.0):
         """
         Parameters
         ----------
@@ -278,6 +281,7 @@ class AtNightConstraint(Constraint):
             Sun is below the horizon and the corrections for atmospheric
             refraction return nonsense values. Default is `True`.
         """
+        self.weight = weight
         self.max_solar_altitude = max_solar_altitude
         self.force_pressure_zero = force_pressure_zero
 
@@ -332,14 +336,14 @@ class AtNightConstraint(Constraint):
         sun_altaz = self._get_solar_altitudes(times, observer, targets)
         solar_altitude = sun_altaz['altitude']
         mask = solar_altitude < self.max_solar_altitude
-        return mask
+        return self.weight*mask
 
 
 class SunSeparationConstraint(Constraint):
     """
     Constrain the distance between the Sun and some targets.
     """
-    def __init__(self, min=None, max=None):
+    def __init__(self, min=None, max=None, weight=1.0):
         """
         Parameters
         ----------
@@ -350,6 +354,7 @@ class SunSeparationConstraint(Constraint):
             Minimum acceptable separation between Sun and target. `None`
             indicates no limit.
         """
+        self.weight = weight
         self.min = min
         self.max = max
 
@@ -368,14 +373,14 @@ class SunSeparationConstraint(Constraint):
         else:
             raise ValueError("No max and/or min specified in "
                              "SunSeparationConstraint.")
-        return mask
+        return self.weight*mask
 
 
 class MoonSeparationConstraint(Constraint):
     """
     Constrain the distance between the Earth's moon and some targets.
     """
-    def __init__(self, min=None, max=None):
+    def __init__(self, min=None, max=None, weight=1.0):
         """
         Parameters
         ----------
@@ -386,6 +391,7 @@ class MoonSeparationConstraint(Constraint):
             Minimum acceptable separation between moon and target. `None`
             indicates no limit.
         """
+        self.weight = weight
         self.min = min
         self.max = max
 
@@ -413,14 +419,14 @@ class MoonSeparationConstraint(Constraint):
         else:
             raise ValueError("No max and/or min specified in "
                              "MoonSeparationConstraint.")
-        return mask
+        return self.weight*mask
 
 
 class MoonIlluminationConstraint(Constraint):
     """
     Constrain the fractional illumination of the Earth's moon.
     """
-    def __init__(self, min=None, max=None):
+    def __init__(self, min=None, max=None, weight=1.0):
         """
         Parameters
         ----------
@@ -431,6 +437,7 @@ class MoonIlluminationConstraint(Constraint):
             Maximum acceptable fractional illumination. `None` indicates no
             limit.
         """
+        self.weight = weight
         self.min = min
         self.max = max
 
@@ -447,14 +454,14 @@ class MoonIlluminationConstraint(Constraint):
         else:
             raise ValueError("No max and/or min specified in "
                              "MoonSeparationConstraint.")
-        return mask
+        return self.weight*mask
 
 
 class LocalTimeConstraint(Constraint):
     """
     Constrain the observable hours.
     """
-    def __init__(self, min=None, max=None):
+    def __init__(self, min=None, max=None, weight=1.0):
         """
         Parameters
         ----------
@@ -475,7 +482,7 @@ class LocalTimeConstraint(Constraint):
         >>> subaru = Observer.at_site("Subaru", timezone="US/Hawaii")
         >>> constraint = LocalTimeConstraint(min=dt.time(23,50), max=dt.time(4,8)) # bound times between 23:50 and 04:08 local Hawaiian time
         """
-
+        self.weight = weight
         self.min = min
         self.max = max
 
@@ -523,7 +530,7 @@ class LocalTimeConstraint(Constraint):
             mask = [(t.datetime.time() > min_time) or
                     (t.datetime.time() < max_time) for t in times]
 
-        return mask
+        return self.weight*mask
 
 
 def is_always_observable(constraints, observer, targets, times=None,
