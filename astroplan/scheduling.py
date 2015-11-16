@@ -44,6 +44,25 @@ class ImageSet(object):
         return imset
 
 class ObservingBlock(object):
+    """
+    An object that represents a block of observing time.  This is the unit thing
+    which the scheduler operates on.  Typically constructed from a list of
+    ImageSets.  This allows a set of observations of a single target, but with
+    different instrument configurations to be scheduled together.
+
+    Parameters
+    ----------
+    duration : `Quantity` with time units
+        The estimated duration of the ObservingBlock.
+    target : `Target`
+        The target observing during this ObservingBlock.
+    constraints : `Constraint`
+        The constraints used to schedule this ObservingBlock.
+    priority : float
+        The relative priortiy of this ObservingBlock relative to others.  Used
+        by the SummingScheduler when choosing the "best" ObservingBlock to
+        schedule.  Defaults to 1.0..
+    """
     @u.quantity_input(duration=u.second)
     def __init__(self, target, duration, constraints=None, priority=1.0):
         self.target = target
