@@ -19,12 +19,24 @@ __all__ = ['ObservingBlock', 'TransitionBlock', 'ImageSet',
 
 
 class ImageSet(object):
+    """
+    An object that represents a set of images taken with the same instrument
+    configuration (e.g. filter and exposure time).
+
+    Parameters
+    ----------
+    duration : `Quantity` with time units
+        The estimated duration of the ImageSet.
+    configuration : dict
+        Dictionary describing the configuration of the instrument.
+    """
     @u.quantity_input(duration=u.second)
-    def __init__(self, duration, configuration={}, constraints=None):
+    def __init__(self, duration, configuration={}):
         self.duration = duration
         self.configuration = configuration
 
     @classmethod
+    @u.quantity_input(overhead=u.second)
     def from_exposures(cls, timeperexp, nexp, overhead=0*u.second,
                             configuration={}):
         duration = nexp*(timeperexp + overhead)
@@ -258,10 +270,9 @@ class SequentialScheduler(Scheduler):
 
 class SummingScheduler(Scheduler):
     """
-    A scheduler that does "stupid simple sequential scheduling".  That is, it
-    simply looks at all the blocks, picks the best one, schedules it, and then
-    moves on.
-
+    A scheduler that does "stupid simple sequential scheduling" using a weighted
+    sum of the constraint results.
+    
     Parameters
     ----------
     start_time : `~astropy.time.Time`
